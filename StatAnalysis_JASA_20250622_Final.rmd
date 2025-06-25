@@ -166,7 +166,7 @@ fig_h1 <- plot_model(fit1_H, type = "pred", terms = c("Years", "Voice_Group"), s
 		y = "H1H2LTAS (dB)",
 		title = "H1H2LTAS Sustained High Marginal Means") 
 fig_h1
-ggsave("H1H2LTASMarginal_JASA_T_test_Final.pdf", width=9.25, height=5.71)
+ggsave("H1H2LTASMarginal_JASA_Final.pdf", width=9.25, height=5.71)
 ```
 ```{r}
 performance::icc(fit1_H)
@@ -189,7 +189,7 @@ fig_h1 <- plot_model(fit1_H, type = "pred", terms = c("Years", "Voice_Group"), s
 		y = "H1H2LTAS (dB)",
 		title = "H1H2LTAS Sustained High Individual Slopes") 
 #fig_h1
-#ggsave("H1H2LTASMarginal_JASA_T_test_Final.pdf", width=9.25, height=5.71)
+#ggsave("H1H2LTASMarginal_JASA_Final.pdf", width=9.25, height=5.71)
 
 # Plot all subjects, colored by Voice_Group
 fig_slopes1 <- fig_h1 + geom_line(data = klang_clean, 
@@ -268,7 +268,7 @@ fig_a1 <- plot_model(fit1_a, type = "pred", terms = c("Years", "Voice_Group"), s
 		y = "Alpha Ratio (dB)",
 		title = "Alpha Ratio Sustained High Marginal Means")
 fig_a1
-ggsave("AlphaMarginal_JASA_T_test_Final.pdf", width = 6, height = 4, dpi = 300)
+ggsave("AlphaMarginal_JASA_Final.pdf", width = 6, height = 4, dpi = 300)
 
 ```
 ```{r}
@@ -291,7 +291,7 @@ fig_a1 <- plot_model(fit1_a, type = "pred", terms = c("Years", "Voice_Group"), s
 		y = "Alpha Ratio (dB)",
 		title = "Alpha Ratio Sustained High Individual Slopes") 
 #fig_h1
-#ggsave("H1H2LTASMarginal_JASA_T_test_Final.pdf", width=9.25, height=5.71)
+#ggsave("H1H2LTASMarginal_JASA_Final.pdf", width=9.25, height=5.71)
 
 # Plot all subjects, colored by Voice_Group
 fig_slopes2 <- fig_a1 + geom_line(data = klang_clean, 
@@ -351,7 +351,7 @@ fig_c1 <- plot_model(fit2_c, type = "pred", terms = c("Years", "Voice_Group"), s
 		title = "CPPs Sustained High Marginal Means") +
   theme(aspect.ratio = 1)
 fig_c1
-ggsave("CPPsMarginal_JASA_T_test_Final.pdf", width=9.25, height=5.71)
+ggsave("CPPsMarginal_JASA_Final.pdf", width=9.25, height=5.71)
 ```
 ```{r}
 performance::icc(fit2_c)
@@ -384,7 +384,7 @@ fig_c1 <- plot_model(fit2_c, type = "pred", terms = c("Years", "Voice_Group"), s
 		y = "CPPs (dB)",
 		title = "CPPs Sustained High Individual Slopes") 
 #fig_h1
-#ggsave("H1H2LTASMarginal_JASA_T_test_Final.pdf", width=9.25, height=5.71)
+#ggsave("H1H2LTASMarginal_JASA_Final.pdf", width=9.25, height=5.71)
 
 # Plot all subjects, colored by Voice_Group
 fig_slopes3 <- fig_c1 + geom_line(data = klang_clean, 
@@ -497,7 +497,7 @@ fig_h2 <- plot_model(fit1_H, type = "pred", terms = c("Years", "Voice_Group"), s
   theme_gray(base_size = 15) +
   labs(x = "Years Studied", y = "H1H2LTAS (dB)", title = "H1H2LTAS Repertoire Marginal Means")
 fig_h2
-ggsave("H1H2LTASAvezzoMarginal_JASA_T_test_Final.pdf", width = 9.25, height = 5.71)
+ggsave("H1H2LTASAvezzoMarginal_JASA_Final.pdf", width = 9.25, height = 5.71)
 ```
 ```{r}
 summary(fit1_H)
@@ -519,7 +519,7 @@ fig_h1 <- plot_model(fit1_H, type = "pred", terms = c("Years", "Voice_Group"), s
 		y = "H1H2LTAS (dB)",
 		title = "H1H2LTAS Repertoire Individual Slopes") 
 #fig_h1
-#ggsave("H1H2LTASMarginal_JASA_T_test_Final.pdf", width=9.25, height=5.71)
+#ggsave("H1H2LTASMarginal_JASA_Final.pdf", width=9.25, height=5.71)
 
 # Plot all subjects, colored by Voice_Group
 fig_h1 + geom_line(data = klang_clean, 
@@ -564,7 +564,7 @@ plot_model(fit3_a, type = "pred", terms = c("Years", "Voice_Group"), show.data =
            colors = palette.colors(palette = "Okabe-Ito")) +
   theme_gray(base_size = 15) +
   labs(x = "Years Studied", y = "Alpha Ratio (dB)", title = "Alpha Ratio Repertoire Marginal Means")
-ggsave("AlphaAvezzoMarginal_JASA_T_test_Final.pdf", width = 9.25, height = 5.71)
+ggsave("AlphaAvezzoMarginal_JASA_Final.pdf", width = 9.25, height = 5.71)
 ```
 ```{r}
 summary(fit3_a)
@@ -605,7 +605,7 @@ fig_c2 <- plot_model(fit1_c, type = "pred", terms = c("Years", "Voice_Group"), s
   theme_gray(base_size = 15) +
   labs(x = "Years Studied", y = "CPPs", title = "CPPs Repertoire Marginal Means")
 fig_c2
-ggsave("CPPsAvezzoMarginal_JASA_T_test_Final.pdf", width = 9.25, height = 5.71)
+ggsave("CPPsAvezzoMarginal_JASA_Final.pdf", width = 9.25, height = 5.71)
 ```
 ```{r}
 summary(fit1_c)
@@ -722,7 +722,7 @@ p.fit3_H
 plot_model(fit3_H, type = "pred", terms = c("Years", "Voice_Group"), show.data = TRUE, colors = palette.colors(palette = "Okabe-Ito")) +
   theme_gray(base_size = 15) +
   labs(x = "Years Studied", y = "H1H2LTAS (dB)", title = "H1H2LTAS Sustained Medium Marginal Means")
-ggsave("H1H2LTASMediumMarginal_JASA_T_test_Final.pdf", width = 9.25, height = 5.71)
+ggsave("H1H2LTASMediumMarginal_JASA_Final.pdf", width = 9.25, height = 5.71)
 ```
 
 ```{r}
@@ -761,7 +761,7 @@ p.fit3_a
 plot_model(fit3_a, type = "pred", terms = c("Years", "Voice_Group"), show.data = TRUE, colors = palette.colors(palette = "Okabe-Ito")) +
   theme_gray(base_size = 15) +
   labs(x = "Years Studied", y = "Alpha Ratio (dB)", title = "Alpha Ratio Medium Sustained Marginal Means")
-ggsave("AlphaMediumMarginal_JASA_T_test_Final.pdf", width = 9.25, height = 5.71)
+ggsave("AlphaMediumMarginal_JASA_Final.pdf", width = 9.25, height = 5.71)
 ```
 
 ```{r}
@@ -800,7 +800,7 @@ fig_c3 <- plot_model(fit1_c, type = "pred", terms = c("Years", "Voice_Group"), s
   labs(x = "Years Studied", y = "CPPs", title = "CPPs Medium Sustained Marginal Means") +
   theme(aspect.ratio = 1)
 fig_c3
-ggsave("CPPsMediumMarginal_JASA_T_test_Final.pdf", width = 9.25, height = 5.71)
+ggsave("CPPsMediumMarginal_JASA_Final.pdf", width = 9.25, height = 5.71)
 ```
 
 ```{r}
@@ -824,7 +824,7 @@ fig_h1 <- plot_model(fit1_c, type = "pred", terms = c("Years", "Voice_Group"), s
 		y = "CPPs (dB)",
 		title = "CPPs Medium Sustained Individual Slopes") 
 #fig_h1
-#ggsave("H1H2LTASMarginal_JASA_T_test_Final.pdf", width=9.25, height=5.71)
+#ggsave("H1H2LTASMarginal_JASA_Final.pdf", width=9.25, height=5.71)
 
 # Plot all subjects, colored by Voice_Group
 fig_h1 + geom_line(data = klang_clean, 
