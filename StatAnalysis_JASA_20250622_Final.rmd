@@ -42,7 +42,7 @@ In each of the nine cases incorporating our three dependent variables and three 
 ## Load and Prepare Data
 ```{r}
 #Set path
-setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
+#setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
 #These are the high sustained samples
 klang <- read.csv("Klang2_JASA_Final.csv", fileEncoding = "UTF-8")
 klang <- klang[c("yearDiff", "H1H2LTAS", "alphaRatio", "CPPs", "Jahr", "Stimmfach", "Voice.Type", "geschlecht", "alter", "id", "dSPL")]
