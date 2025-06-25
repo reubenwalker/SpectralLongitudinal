@@ -46,14 +46,14 @@ Spectral measures were derived from three vocal exercises using **Long-Term Aver
 
 ### R Analysis
 
-1. Open `analysis.Rmd` in RStudio.
+1. Open `StatAnalysis_JASA_20250622.Rmd` in RStudio.
 2. Ensure the working directory is set automatically (e.g., via `rstudioapi` if applicable).
 3. Ensure all required R packages are installed (`lme4`, `ggplot2`, etc.).
 4. Knit the document to PDF or HTML.
 
 ### Python Script
 
-To run the LTAS analysis separately:
+To run the LTAS analysis on test data:
 Navigate to folder with audio files with naming convention in the form:
 audioID&YYYY_MM_DD&test1.wav
 Where 
