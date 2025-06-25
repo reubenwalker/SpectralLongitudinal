@@ -1,0 +1,960 @@
+---
+title: "Retrospective Longitudinal Analysis of Spectral Features Reveals Divergent Vocal Development Patterns for Treble and Non-Treble Singers"
+author: "Reuben Walker"
+date: (`r Sys.Date()`)
+output: pdf_document
+toc: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r load_libraries}
+suppressPackageStartupMessages({
+  suppressWarnings({
+    library(ggplot2)
+    library(dplyr)
+    library(ggpubr)
+    library(sjPlot)
+    library(lmerTest)
+    library(ggeffects)
+    library(ggResidpanel)
+    library(performance)
+    library(emmeans)
+    library(knitr)
+    library(patchwork)
+    library(viridis)
+  })
+})
+```
+Research Questions: 
+
+Do classical singers develop similarly over the course of their conservatory training or does their spectral development exhibit differences based on a grouping in female/countertenor or male voice types?
+
+Does breathiness decrease among female students with vocal training?
+
+Statistical Analysis
+
+In each of the nine cases incorporating our three dependent variables and three sung tasks, we performed a linear mixed model with the predictor variables years of study and Voice_Group (male or female/countertenor), with specific emphasis on the interaction between the two predictors. A control variable delta SPL (dSPL) was measured from a reference sample. To account for inter-subject variation in baseline and development, random slopes and intercepts were specified for the individual subjects. We iteratively simplified the models by removing non-significant terms beginning with the interaction term. A linear mixed model was then performed on the female subset for each sung task to investigate increases in CPPs. In order to adjust for multiple comparisons, we adjusted our significance level using the Benjamini-Hochberg correction. We calculated estimated marginal means from the resulting models to examine differences between Voice_Group at different intervals of training.  
+
+# Sustained high phonation
+## Load and Prepare Data
+```{r}
+#Set path
+setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
+#These are the high sustained samples
+klang <- read.csv("Klang2_JASA_Final.csv", fileEncoding = "UTF-8")
+klang <- klang[c("yearDiff", "H1H2LTAS", "alphaRatio", "CPPs", "Jahr", "Stimmfach", "Voice.Type", "geschlecht", "alter", "id", "dSPL")]
+names(klang)[names(klang) == "geschlecht"] <- "Gender"
+names(klang)[names(klang) == "yearDiff"] <- "Years"
+names(klang)[names(klang) == "alter"] <- "Age"
+klang$Voice_Group[klang$Stimmfach == "Sop/Mezzo/Alt"] <- "Treble"
+klang$Voice_Group[klang$Stimmfach == "Ten/Bar/Bass"] <- "Non-Treble"
+klang$Gender[klang$Gender == "männl."] <- "Male"
+klang$Gender[klang$Gender == "weibl."] <- "Female"
+
+```
+## Filtering Data
+```{r}
+# Step 1: Count total unique male and female students
+total_counts <- klang %>%
+  group_by(Gender) %>%
+  summarise(Total_Students = n_distinct(id))
+
+# Step 2: Filter to only include students with Years <= 4
+klang_filtered <- klang %>%
+  filter(Years <= 4)
+
+# Count unique male and female students after filtering
+filtered_counts <- klang_filtered %>%
+  group_by(Gender) %>%
+  summarise(Filtered_Students = n_distinct(id))
+
+# Step 3: Remove students with only one recording
+id_counts <- klang_filtered %>%
+  count(id)  # Count occurrences of each student (id)
+
+valid_ids <- id_counts %>%
+  filter(n > 1) %>%
+  pull(id)  # Get list of students who appear more than once
+
+klang_final <- klang_filtered %>%
+  filter(id %in% valid_ids)  # Keep only students with multiple recordings
+
+# Count unique male and female students after final filtering
+final_counts <- klang_final %>%
+  group_by(Gender) %>%
+  summarise(Final_Students = n_distinct(id))
+
+# Print results
+print(total_counts)      # Total students by gender
+print(filtered_counts)   # After Years <= 4 restriction
+print(final_counts)      # After removing single-recording students
+
+# Update the klang dataframe to keep only the final filtered version
+klang <- klang_final
+```
+```{r}
+# Split the data into Male/Female and remove Gender column
+klang_f <- subset(klang, Gender %in% c("Female"))
+# remove Gender
+klang_f <- subset(klang_f, select = c("Years", "H1H2LTAS", "alphaRatio", "CPPs", "Jahr", "Gender", "Voice.Type", "Age", "id", "dSPL"))
+
+klang_m <- subset(klang, Gender %in% c("Male"))
+klang_m <- subset(klang_m, select = c("Years", "H1H2LTAS", "alphaRatio", "CPPs", "Jahr", "Gender", "Voice.Type", "Age", "id","dSPL"))
+```
+## H1H2LTAS
+
+```{r}
+# Here we take a look at the correlation matrix for our different metrics.
+numeric_columns <- klang_f[, c("Years", "H1H2LTAS", "alphaRatio", "CPPs")]
+# Omit na values:
+cor(na.omit(numeric_columns))
+# Repeat for male voices
+numeric_columns <- klang_m[, c("Years", "H1H2LTAS", "alphaRatio", "CPPs")]
+# Omit na values:
+cor(na.omit(numeric_columns))
+```
+
+It makes intuitive sense that H1H2LTAS has a strong negative correlation to alpha ratio in women because H2 is above 1000 Hz.
+The direction of the Years correlations fits with the hypothesese:
+H1H2LTAS tends to increase for women, decrease for men
+Alpha Ratio increases for men, seems to remain constant for women
+CPPs tends to increase for both men and women
+
+Here we take a look at our linear mixed models:
+```{r}
+#Let's make treble the reference group
+klang$Voice_Group <- factor(klang$Voice_Group)  # convert to factor
+klang$Voice_Group <- relevel(klang$Voice_Group, ref = "Treble")  # now relevel
+```
+
+```{r}
+fit0_H <- lmer(H1H2LTAS~Years*Voice_Group + dSPL + (Years | id), data=klang, na.action="na.omit",REML = T)
+anova(fit0_H)
+```
+We remove dSPL from the model as it was non-significant.
+```{r}
+fit1_H <- lmer(H1H2LTAS~Years*Voice_Group + (Years | id), data=klang, na.action="na.omit",REML = T)
+anova(fit1_H)
+```
+As the interaction is significant we leave years
+```{r}
+margin1 <- ggpredict(fit1_H, c("Years", "Voice_Group"), ci_level=0.95)
+margin1
+```
+The directionality of the two groups is clear (female increase, male decrease), though the confidence intervals overlap.
+```{r}
+
+emm1_H <- emmeans::emmeans(fit1_H, ~ Years:Voice_Group)
+pairs(emm1_H)
+p.fit1_H <- ggResidpanel::resid_panel(fit1_H,
+              plots = c("resid", "qq", "hist", "index"),
+              smoother = TRUE,
+              qqbands = TRUE,
+              title.opt = TRUE)
+p.fit1_H
+```
+
+```{r}
+summary(fit1_H)
+fig_h1 <- plot_model(fit1_H, type = "pred", terms = c("Years", "Voice_Group"), show.data= TRUE,
+           colors = palette.colors(palette = "Okabe-Ito")) +
+  theme_gray(base_size=15) +
+  labs(x = "Years Studied",
+		y = "H1H2LTAS (dB)",
+		title = "H1H2LTAS Sustained High Marginal Means") 
+fig_h1
+ggsave("H1H2LTASMarginal_JASA_T_test_Final.pdf", width=9.25, height=5.71)
+```
+```{r}
+performance::icc(fit1_H)
+```
+```{r}
+#Individual Trajectories
+
+# Clean and prep
+klang_clean <- klang[!is.na(klang$H1H2LTAS), ]
+klang_clean$fitted <- fitted(fit1_H)
+
+# Ensure factors
+klang_clean$id <- as.factor(klang_clean$id)
+klang_clean$Voice_Group <- as.factor(klang_clean$Voice_Group)
+
+fig_h1 <- plot_model(fit1_H, type = "pred", terms = c("Years", "Voice_Group"), show.data= FALSE,
+           colors = palette.colors(palette = "Okabe-Ito")) +
+  theme_gray(base_size=15) +
+  labs(x = "Years Studied",
+		y = "H1H2LTAS (dB)",
+		title = "H1H2LTAS Sustained High Individual Slopes") 
+#fig_h1
+#ggsave("H1H2LTASMarginal_JASA_T_test_Final.pdf", width=9.25, height=5.71)
+
+# Plot all subjects, colored by Voice_Group
+fig_slopes1 <- fig_h1 + geom_line(data = klang_clean, 
+            aes(x = Years, y = fitted, group = id, color = Voice_Group), 
+            alpha = 0.3, linewidth = 0.7, inherit.aes = FALSE) #+
+
+ggsave("H1H2LTASMarginal_JASA_Individual_Final.pdf", width=9.25, height=5.71)
+
+```
+```{r}
+library(lme4)
+library(broom.mixed)
+
+# Extract random slopes
+re_slopes <- ranef(fit1_H)$id
+re_df <- data.frame(id = rownames(re_slopes), slope = re_slopes$Years)
+
+# Join Voice_Group info
+re_df <- left_join(re_df, unique(klang_clean[, c("id", "Voice_Group")]), by = "id")
+
+# Plot random slopes by Voice Group
+ggplot(re_df, aes(x = reorder(id, slope), y = slope, fill = Voice_Group)) +
+  geom_col(show.legend = TRUE) +
+  coord_flip() +
+  scale_fill_viridis_d(option = "C") +
+  labs(title = "Random Slopes by Subject",
+       x = "Subject ID", y = "Deviation in Years Slope") +
+  theme_minimal(base_size = 14)
+```
+## Alpha-Ratio
+
+```{r}
+#Let's make non-treble the reference group
+#klang$Voice_Group <- factor(klang$Voice_Group)  # convert to factor
+klang$Voice_Group <- relevel(klang$Voice_Group, ref = "Non-Treble")  # now relevel
+```
+
+```{r}
+#Same process for Alpha Ratio. 
+fit0_a <- lmer(alphaRatio~Years*Voice_Group +dSPL + (Years | id), data=klang, na.action="na.omit",REML=T)
+anova(fit0_a)
+
+```
+Simplify removing the insignificant dSPL term
+```{r}
+#Same process for Alpha Ratio. 
+fit1_a <- lmer(alphaRatio~Years*Voice_Group + (Years | id), data=klang, na.action="na.omit",REML=T)
+anova(fit1_a)
+
+```
+Again the interaction term is significant, so we don't reduce further.
+```{r}
+margin1 <- ggpredict(fit1_a, c("Years", "Voice_Group"), ci_level=0.95)
+margin1
+```
+For alpha ratio, the male means in year four have increased beyond the confidence interval at the beginning of studies.
+The female means have not changed.
+```{r}
+
+emm1_a <- emmeans::emmeans(fit1_a, ~ Years:Voice_Group)
+pairs(emm1_a)
+p.fit1_a <- ggResidpanel::resid_panel(fit1_a,
+              plots = c("resid", "qq", "hist", "index"),
+              smoother = TRUE,
+              qqbands = TRUE,
+              title.opt = TRUE)
+p.fit1_a
+```
+
+```{r}
+summary(fit1_a)
+fig_a1 <- plot_model(fit1_a, type = "pred", terms = c("Years", "Voice_Group"), show.data= TRUE,
+           colors = palette.colors(palette = "Okabe-Ito")) +
+  theme_gray(base_size=15) +
+  labs(x = "Years Studied",
+		y = "Alpha Ratio (dB)",
+		title = "Alpha Ratio Sustained High Marginal Means")
+fig_a1
+ggsave("AlphaMarginal_JASA_T_test_Final.pdf", width = 6, height = 4, dpi = 300)
+
+```
+```{r}
+performance::icc(fit1_a)
+```
+
+```{r}
+# INDIVIDUAL SLOPES clean and prep
+klang_clean <- klang[!is.na(klang$alphaRatio), ]
+klang_clean$fitted <- fitted(fit1_a)
+
+# Ensure factors
+klang_clean$id <- as.factor(klang_clean$id)
+klang_clean$Voice_Group <- as.factor(klang_clean$Voice_Group)
+
+fig_a1 <- plot_model(fit1_a, type = "pred", terms = c("Years", "Voice_Group"), show.data= FALSE,
+           colors = palette.colors(palette = "Okabe-Ito")) +
+  theme_gray(base_size=15) +
+  labs(x = "Years Studied",
+		y = "Alpha Ratio (dB)",
+		title = "Alpha Ratio Sustained High Individual Slopes") 
+#fig_h1
+#ggsave("H1H2LTASMarginal_JASA_T_test_Final.pdf", width=9.25, height=5.71)
+
+# Plot all subjects, colored by Voice_Group
+fig_slopes2 <- fig_a1 + geom_line(data = klang_clean, 
+            aes(x = Years, y = fitted, group = id, color = Voice_Group), 
+            alpha = 0.3, linewidth = 0.7, inherit.aes = FALSE) #+
+
+ggsave("AlphaMarginal_JASA_Individual_Final.pdf", width=9.25, height=5.71)
+
+```
+## CPPS
+
+```{r}
+#Let's make treble the reference group
+klang$Voice_Group <- relevel(klang$Voice_Group, ref = "Treble")  # now relevel
+```
+
+```{r}
+#Same process for CPPs. _Review interaction term
+fit0_c <- lmer(CPPs~Years*Voice_Group + dSPL + (Years | id), data=klang, na.action="na.omit",REML=T)
+anova(fit0_c)
+```
+```{r}
+#We can remove the interaction term
+fit1_c <- lmer(CPPs~Years + Voice_Group + dSPL + (Years | id), data=klang, na.action="na.omit",REML=T)
+anova(fit1_c)
+```
+Now we can remove dSPL 
+```{r}
+
+fit2_c <- lmer(CPPs~Years + Voice_Group + (Years | id), data=klang, na.action="na.omit",REML=T)
+anova(fit2_c)
+
+```
+
+We have significant effects for Years and Voice_Group
+```{r}
+margin1 <- ggpredict(fit2_c, c("Years", "Voice_Group"), ci_level=0.95)
+margin1
+
+emm1_c <- emmeans::emmeans(fit2_c, ~ Years:Voice_Group)
+pairs(emm1_c)
+p.fit2_c <- ggResidpanel::resid_panel(fit2_c,
+              plots = c("resid", "qq", "hist", "index"),
+              smoother = TRUE,
+              qqbands = TRUE,
+              title.opt = TRUE)
+p.fit2_c
+```
+
+```{r}
+summary(fit2_c)
+fig_c1 <- plot_model(fit2_c, type = "pred", terms = c("Years", "Voice_Group"), show.data= TRUE,
+           colors = palette.colors(palette = "Okabe-Ito")) +
+  theme_gray(base_size=15) +
+  labs(x = "Years Studied",
+		y = "CPPs",
+		title = "CPPs Sustained High Marginal Means") +
+  theme(aspect.ratio = 1)
+fig_c1
+ggsave("CPPsMarginal_JASA_T_test_Final.pdf", width=9.25, height=5.71)
+```
+```{r}
+performance::icc(fit2_c)
+```
+
+Secondary research question: Do female voices became less breathy?
+```{r}
+fit0_c_f <- lmer(CPPs~Years + dSPL + (Years | id), data=klang_f, na.action="na.omit",REML=T)
+anova(fit0_c_f)
+```
+dSPL can be removed
+```{r}
+fit1_c_f <- lmer(CPPs~Years + (Years | id), data=klang_f, na.action="na.omit",REML=T)
+summary(fit1_c_f)
+```
+
+```{r}
+# INDIVIDUAL SLOPES clean and prep
+klang_clean <- klang[!is.na(klang$CPPs), ]
+klang_clean$fitted <- fitted(fit2_c)
+
+# Ensure factors
+klang_clean$id <- as.factor(klang_clean$id)
+klang_clean$Voice_Group <- as.factor(klang_clean$Voice_Group)
+
+fig_c1 <- plot_model(fit2_c, type = "pred", terms = c("Years", "Voice_Group"), show.data= FALSE,
+           colors = palette.colors(palette = "Okabe-Ito")) +
+  theme_gray(base_size=15) +
+  labs(x = "Years Studied",
+		y = "CPPs (dB)",
+		title = "CPPs Sustained High Individual Slopes") 
+#fig_h1
+#ggsave("H1H2LTASMarginal_JASA_T_test_Final.pdf", width=9.25, height=5.71)
+
+# Plot all subjects, colored by Voice_Group
+fig_slopes3 <- fig_c1 + geom_line(data = klang_clean, 
+            aes(x = Years, y = fitted, group = id, color = Voice_Group), 
+            alpha = 0.3, linewidth = 0.7, inherit.aes = FALSE) #+
+
+ggsave("CPPsMarginal_JASA_Individual_Final.pdf", width=9.25, height=5.71)
+```
+
+Benjamini-Hochberg Correction
+We take the p-values from all of our initial linear mixed models:
+```{r}
+p_values_H <- summary(fit0_H)$coefficients[, "Pr(>|t|)"]
+p_values_a <- summary(fit0_a)$coefficients[, "Pr(>|t|)"]
+p_values_c <- summary(fit0_c)$coefficients[, "Pr(>|t|)"]
+p_values_c_f <- summary(fit0_c_f)$coefficients[, "Pr(>|t|)"]
+
+# Organize p-values into a data frame
+p_values_df <- data.frame(
+  H1H2LTAS = p_values_H,
+  AlphaRatio = p_values_a,
+  CPPs = p_values_c#,
+  #Model4 = p_values_c_f
+)
+
+# Combine all p-values into a single vector
+all_p_values <- c(p_values_H, p_values_a, p_values_c)
+
+#Save the unadjusted for final comparison:
+p_2 <- all_p_values
+p_2_f <- p_values_c_f
+```
+
+# Repertoire: Avezzo a vivere
+
+Now for the repertoire sample "Avezzo a vivere"
+
+## Load and Prepare Data
+```{r}
+klang6 <- read.csv("Klang6_JASA_Final.csv", fileEncoding = "UTF-8")
+klang6 <- klang6 %>%
+  select(yearDiff, H1H2LTAS, alphaRatio, CPPs, Jahr, Stimmfach, Voice.Type, geschlecht, alter, id, dSPL) %>%
+  rename(Years = yearDiff, Gender = geschlecht, Age = alter)
+
+# Create Voice Grouping
+klang6 <- klang6 %>%
+  mutate(
+    Voice_Group = case_when(
+      Stimmfach == "Sop/Mezzo/Alt" ~ "Treble",
+      Stimmfach == "Ten/Bar/Bass" ~ "Non-Treble"
+    ),
+    Gender = recode(Gender, "männl." = "Male", "weibl." = "Female")
+  )
+```
+
+## Filtering Data
+```{r}
+# Step 1: Count total unique students by gender
+total_counts <- klang6 %>% group_by(Gender) %>% summarise(Total_Students = n_distinct(id))
+
+# Step 2: Filter students with Years <= 4
+klang6_filtered <- klang6 %>% filter(Years <= 4)
+filtered_counts <- klang6_filtered %>% group_by(Gender) %>% summarise(Filtered_Students = n_distinct(id))
+
+# Step 3: Remove students with only one recording
+valid_ids <- klang6_filtered %>% count(id) %>% filter(n > 1) %>% pull(id)
+klang6_final <- klang6_filtered %>% filter(id %in% valid_ids)
+final_counts <- klang6_final %>% group_by(Gender) %>% summarise(Final_Students = n_distinct(id))
+
+# Print Results
+print(total_counts)
+print(filtered_counts)
+print(final_counts)
+
+# Update dataset
+klang6 <- klang6_final
+```
+
+## H1H2LTAS Analysis
+
+```{r}
+#Let's make treble the reference group
+klang6$Voice_Group <- factor(klang6$Voice_Group)  # convert to factor
+klang6$Voice_Group <- relevel(klang6$Voice_Group, ref = "Treble")  # now relevel
+```
+
+```{r}
+fit0_H <- lmer(H1H2LTAS ~ Years * Voice_Group + dSPL + (Years | id), data = klang6, na.action = "na.omit", REML = TRUE)
+anova(fit0_H)
+```
+Remove the dSPL term:
+```{r}
+fit1_H <- lmer(H1H2LTAS ~ Years * Voice_Group + (Years | id), data = klang6, na.action = "na.omit", REML = TRUE)
+anova(fit1_H)
+# Marginal Means
+margin1 <- ggpredict(fit1_H, c("Years", "Voice_Group"), ci_level = 0.95)
+print(margin1)
+
+# Pairwise Comparisons
+emm0_H <- emmeans(fit1_H, ~ Years:Voice_Group)
+pairs(emm0_H)
+
+# Residual Diagnostics
+p.fit0_H <- ggResidpanel::resid_panel(fit1_H, plots = c("resid", "qq", "hist", "index"), smoother = TRUE, qqbands = TRUE)
+print(p.fit0_H)
+
+# Plot Model Predictions
+fig_h2 <- plot_model(fit1_H, type = "pred", terms = c("Years", "Voice_Group"), show.data = TRUE,
+                      colors = palette.colors(palette = "Okabe-Ito")) +
+  theme_gray(base_size = 15) +
+  labs(x = "Years Studied", y = "H1H2LTAS (dB)", title = "H1H2LTAS Repertoire Marginal Means")
+fig_h2
+ggsave("H1H2LTASAvezzoMarginal_JASA_T_test_Final.pdf", width = 9.25, height = 5.71)
+```
+```{r}
+summary(fit1_H)
+performance::icc(fit1_H)
+```
+```{r}
+# INDIVIDUAL SLOPES clean and prep
+klang_clean <- klang6[!is.na(klang6$H1H2LTAS), ]
+klang_clean$fitted <- fitted(fit1_H)
+
+# Ensure factors
+klang_clean$id <- as.factor(klang_clean$id)
+klang_clean$Voice_Group <- as.factor(klang_clean$Voice_Group)
+
+fig_h1 <- plot_model(fit1_H, type = "pred", terms = c("Years", "Voice_Group"), show.data= FALSE,
+           colors = palette.colors(palette = "Okabe-Ito")) +
+  theme_gray(base_size=15) +
+  labs(x = "Years Studied",
+		y = "H1H2LTAS (dB)",
+		title = "H1H2LTAS Repertoire Individual Slopes") 
+#fig_h1
+#ggsave("H1H2LTASMarginal_JASA_T_test_Final.pdf", width=9.25, height=5.71)
+
+# Plot all subjects, colored by Voice_Group
+fig_h1 + geom_line(data = klang_clean, 
+            aes(x = Years, y = fitted, group = id, color = Voice_Group), 
+            alpha = 0.3, linewidth = 0.7, inherit.aes = FALSE) #+
+
+ggsave("H1H2LTASMarginalRepertoire_JASA_Individual_Final.pdf", width=9.25, height=5.71)
+```
+
+## Alpha Ratio Analysis
+
+```{r}
+#Let's make treble the reference group
+klang6$Voice_Group <- relevel(klang6$Voice_Group, ref = "Non-Treble")  # now relevel
+```
+
+```{r}
+fit0_a <- lmer(alphaRatio ~ Years * Voice_Group + dSPL + (Years | id), data = klang6, na.action = "na.omit", REML = TRUE)
+anova(fit0_a)
+```
+```{r}
+#Remove dSPL
+fit1_a <- lmer(alphaRatio ~ Years * Voice_Group + (Years | id), data = klang6, na.action = "na.omit", REML = TRUE)
+anova(fit1_a)
+
+# Model Simplification
+fit2_a <- update(fit1_a, . ~ . - Years:Voice_Group)
+anova(fit2_a)
+
+fit3_a <- update(fit2_a, . ~ . - Years)
+anova(fit3_a)
+
+# Compare Models
+anova(fit0_a, fit1_a, fit2_a, fit3_a)
+
+# Residual Diagnostics
+p.fit3_a <- ggResidpanel::resid_panel(fit3_a, plots = c("resid", "qq", "hist", "index"), smoother = TRUE, qqbands = TRUE)
+print(p.fit3_a)
+
+# Plot Model Predictions
+plot_model(fit3_a, type = "pred", terms = c("Years", "Voice_Group"), show.data = TRUE,
+           colors = palette.colors(palette = "Okabe-Ito")) +
+  theme_gray(base_size = 15) +
+  labs(x = "Years Studied", y = "Alpha Ratio (dB)", title = "Alpha Ratio Repertoire Marginal Means")
+ggsave("AlphaAvezzoMarginal_JASA_T_test_Final.pdf", width = 9.25, height = 5.71)
+```
+```{r}
+summary(fit3_a)
+performance::icc(fit3_a)
+```
+
+## CPPs Analysis
+
+```{r}
+#Let's make treble the reference group
+klang6$Voice_Group <- relevel(klang6$Voice_Group, ref = "Treble")  # now relevel
+```
+
+```{r}
+fit0_c <- lmer(CPPs ~ Years * Voice_Group + dSPL + (Years | id), data = klang6, na.action = "na.omit", REML = TRUE)
+anova(fit0_c)
+```
+```{r}
+#Remove dSPL
+fit1_c <- lmer(CPPs ~ Years * Voice_Group + (Years | id), data = klang6, na.action = "na.omit", REML = TRUE)
+anova(fit1_c)
+
+# Marginal Means
+margin1 <- ggpredict(fit1_c, c("Years", "Voice_Group"), ci_level = 0.95)
+print(margin1)
+
+# Pairwise Comparisons
+emm1_c <- emmeans(fit1_c, ~ Years:Voice_Group)
+pairs(emm1_c)
+
+# Residual Diagnostics
+p.fit1_c <- ggResidpanel::resid_panel(fit1_c, plots = c("resid", "qq", "hist", "index"), smoother = TRUE, qqbands = TRUE)
+print(p.fit1_c)
+
+# Plot Model Predictions
+fig_c2 <- plot_model(fit1_c, type = "pred", terms = c("Years", "Voice_Group"), show.data = TRUE,
+                      colors = palette.colors(palette = "Okabe-Ito")) +
+  theme_gray(base_size = 15) +
+  labs(x = "Years Studied", y = "CPPs", title = "CPPs Repertoire Marginal Means")
+fig_c2
+ggsave("CPPsAvezzoMarginal_JASA_T_test_Final.pdf", width = 9.25, height = 5.71)
+```
+```{r}
+summary(fit1_c)
+performance::icc(fit1_c)
+```
+
+```{r}
+fit0_c_f <- lmer(CPPs ~ Years  + dSPL + (Years | id), data = klang6 %>% filter(Gender == "Female"), REML = TRUE)
+anova(fit0_c_f)
+```
+```{r}
+#Remove dSPL
+fit1_c_f <- lmer(CPPs ~ Years + (Years | id), data = klang6 %>% filter(Gender == "Female"), REML = TRUE)
+summary(fit1_c_f)
+```
+
+```{r}
+p_values_H <- summary(fit0_H)$coefficients[, "Pr(>|t|)"]
+p_values_a <- summary(fit0_a)$coefficients[, "Pr(>|t|)"]
+p_values_c <- summary(fit0_c)$coefficients[, "Pr(>|t|)"]
+p_values_c_f <- summary(fit0_c_f)$coefficients[, "Pr(>|t|)"]
+
+all_p_values <- c(p_values_H, p_values_a, p_values_c)#, p_values_c_f)
+p_6 <- all_p_values
+p_6_f <- p_values_c_f
+```
+
+
+# Medium Sustained /a/
+## Load and Prepare Data
+```{r}
+# Load data
+klang1 <- read.csv("Klang1_JASA_Final.csv", fileEncoding = "UTF-8")
+klang1 <- klang1[c("yearDiff", "H1H2LTAS", "alphaRatio", "CPPs", "Jahr", "Stimmfach", "Voice.Type", "geschlecht", "alter", "id", "dSPL")]
+names(klang1)[names(klang1) == "geschlecht"] <- "Gender"
+names(klang1)[names(klang1) == "yearDiff"] <- "Years"
+names(klang1)[names(klang1) == "alter"] <- "Age"
+klang1$Voice_Group[klang1$Stimmfach == "Sop/Mezzo/Alt"] <- "Treble"
+klang1$Voice_Group[klang1$Stimmfach == "Ten/Bar/Bass"] <- "Non-Treble"
+klang1$Gender[klang1$Gender == "männl."] <- "Male"
+klang1$Gender[klang1$Gender == "weibl."] <- "Female"
+
+```
+## Filtering Data
+```{r}
+# Step 1: Count total unique male and female students
+total_counts <- klang1 %>%
+  group_by(Gender) %>%
+  summarise(Total_Students = n_distinct(id))
+
+# Step 2: Filter to only include students with Years <= 4
+klang1_filtered <- klang1 %>%
+  filter(Years <= 4)
+
+# Count unique male and female students after filtering
+filtered_counts <- klang1_filtered %>%
+  group_by(Gender) %>%
+  summarise(Filtered_Students = n_distinct(id))
+
+# Step 3: Remove students with only one recording
+id_counts <- klang1_filtered %>%
+  count(id)  # Count occurrences of each student (id)
+
+valid_ids <- id_counts %>%
+  filter(n > 1) %>%
+  pull(id)  # Get list of students who appear more than once
+
+klang1_final <- klang1_filtered %>%
+  filter(id %in% valid_ids)  # Keep only students with multiple recordings
+
+# Count unique male and female students after final filtering
+final_counts <- klang1_final %>%
+  group_by(Gender) %>%
+  summarise(Final_Students = n_distinct(id))
+
+# Print results
+print(total_counts)      # Total students by gender
+print(filtered_counts)   # After Years <= 4 restriction
+print(final_counts)      # After removing single-recording students
+
+# Update the klang1 dataframe to keep only the final filtered version
+klang1 <- klang1_final
+```
+## H1H2LTAS
+```{r}
+#Let's make treble the reference group
+klang1$Voice_Group <- factor(klang1$Voice_Group)  # convert to factor
+klang1$Voice_Group <- relevel(klang1$Voice_Group, ref = "Treble")  # now relevel
+```
+
+```{r}
+fit0_H <- lmer(H1H2LTAS ~ Years * Voice_Group + dSPL + (Years | id), data = klang1, REML = TRUE)
+anova(fit0_H)
+```
+```{r}
+#After significance correction, not significant: Remove dSPL
+fit1_H <- lmer(H1H2LTAS ~ Years * Voice_Group + (Years | id), data = klang1, REML = TRUE)
+anova(fit1_H)
+
+#After significance correction, not significant: Remove interaction
+fit2_H <- update(fit1_H, . ~ . - Years:Voice_Group)
+anova(fit2_H)
+#Remove years
+fit3_H <- update(fit2_H, . ~ . - Years)
+anova(fit3_H)
+
+anova(fit0_H, fit1_H, fit2_H, fit3_H, digits = 10, test = "LRT")
+
+p.fit3_H <- resid_panel(fit3_H, plots = c("resid", "qq", "hist", "index"), smoother = TRUE, qqbands = TRUE, title.opt = TRUE)
+p.fit3_H
+```
+
+```{r}
+plot_model(fit3_H, type = "pred", terms = c("Years", "Voice_Group"), show.data = TRUE, colors = palette.colors(palette = "Okabe-Ito")) +
+  theme_gray(base_size = 15) +
+  labs(x = "Years Studied", y = "H1H2LTAS (dB)", title = "H1H2LTAS Sustained Medium Marginal Means")
+ggsave("H1H2LTASMediumMarginal_JASA_T_test_Final.pdf", width = 9.25, height = 5.71)
+```
+
+```{r}
+summary(fit3_H)
+performance::icc(fit3_H)
+```
+
+## Alpha-Ratio
+```{r}
+#Let's make treble the reference group
+klang1$Voice_Group <- relevel(klang1$Voice_Group, ref = "Non-Treble")  # now relevel
+```
+
+```{r}
+fit0_a <- lmer(alphaRatio ~ Years * Voice_Group + dSPL + (Years | id), data = klang1, REML = TRUE)
+anova(fit0_a)
+```
+```{r}
+#Remove dSPL
+fit1_a <- lmer(alphaRatio ~ Years * Voice_Group + (Years | id), data = klang1, REML = TRUE)
+anova(fit1_a)
+
+fit2_a <- update(fit1_a, . ~ . - Years:Voice_Group)
+anova(fit2_a)
+
+fit3_a <- update(fit2_a, . ~ . - Years)
+anova(fit3_a)
+
+anova(fit0_a, fit1_a, fit2_a, fit3_a, digits = 10)
+
+p.fit3_a <- resid_panel(fit3_a, plots = c("resid", "qq", "hist", "index"), smoother = TRUE, qqbands = TRUE, title.opt = TRUE)
+p.fit3_a
+```
+
+```{r}
+plot_model(fit3_a, type = "pred", terms = c("Years", "Voice_Group"), show.data = TRUE, colors = palette.colors(palette = "Okabe-Ito")) +
+  theme_gray(base_size = 15) +
+  labs(x = "Years Studied", y = "Alpha Ratio (dB)", title = "Alpha Ratio Medium Sustained Marginal Means")
+ggsave("AlphaMediumMarginal_JASA_T_test_Final.pdf", width = 9.25, height = 5.71)
+```
+
+```{r}
+summary(fit3_a)
+performance::icc(fit3_a)
+```
+
+## CPPs
+```{r}
+#Let's make treble the reference group
+klang1$Voice_Group <- relevel(klang1$Voice_Group, ref = "Treble")  # now relevel
+```
+
+```{r}
+fit0_c <- lmer(CPPs ~ Years * Voice_Group + dSPL + (Years | id), data = klang1, REML = TRUE)
+anova(fit0_c)
+```
+```{r}
+#Remove dSPL
+fit1_c <- lmer(CPPs ~ Years * Voice_Group + (Years | id), data = klang1, REML = TRUE)
+anova(fit1_c)
+
+margin1 <- ggpredict(fit1_c, c("Years", "Voice_Group"), ci_level = 0.95)
+print(margin1)
+
+emm0_c <- emmeans(fit1_c, ~ Years:Voice_Group)
+pairs(emm0_c)
+
+p.fit1_c <- resid_panel(fit1_c, plots = c("resid", "qq", "hist", "index"), smoother = TRUE, qqbands = TRUE, title.opt = TRUE)
+p.fit1_c
+```
+
+```{r}
+fig_c3 <- plot_model(fit1_c, type = "pred", terms = c("Years", "Voice_Group"), show.data = TRUE, colors = palette.colors(palette = "Okabe-Ito")) +
+  theme_gray(base_size = 15) +
+  labs(x = "Years Studied", y = "CPPs", title = "CPPs Medium Sustained Marginal Means") +
+  theme(aspect.ratio = 1)
+fig_c3
+ggsave("CPPsMediumMarginal_JASA_T_test_Final.pdf", width = 9.25, height = 5.71)
+```
+
+```{r}
+summary(fit1_c)
+performance::icc(fit1_c)
+```
+
+```{r}
+# INDIVIDUAL SLOPES clean and prep
+klang_clean <- klang1[!is.na(klang1$H1H2LTAS), ]
+klang_clean$fitted <- fitted(fit1_c)
+
+# Ensure factors
+klang_clean$id <- as.factor(klang_clean$id)
+klang_clean$Voice_Group <- as.factor(klang_clean$Voice_Group)
+
+fig_h1 <- plot_model(fit1_c, type = "pred", terms = c("Years", "Voice_Group"), show.data= FALSE,
+           colors = palette.colors(palette = "Okabe-Ito")) +
+  theme_gray(base_size=15) +
+  labs(x = "Years Studied",
+		y = "CPPs (dB)",
+		title = "CPPs Medium Sustained Individual Slopes") 
+#fig_h1
+#ggsave("H1H2LTASMarginal_JASA_T_test_Final.pdf", width=9.25, height=5.71)
+
+# Plot all subjects, colored by Voice_Group
+fig_h1 + geom_line(data = klang_clean, 
+            aes(x = Years, y = fitted, group = id, color = Voice_Group), 
+            alpha = 0.3, linewidth = 0.7, inherit.aes = FALSE) #+
+
+ggsave("CPPsMarginalMedium_JASA_Individual_Final.pdf", width=9.25, height=5.71)
+```
+
+
+
+```{r}
+fit0_c_f <- lmer(CPPs ~ Years + dSPL + (Years | id), data = klang1 %>% filter(Gender == "Female"), REML = TRUE)
+anova(fit0_c_f)
+```
+```{r}
+#Remove dSPL
+fit1_c_f <- lmer(CPPs ~ Years + (Years | id), data = klang1 %>% filter(Gender == "Female"), REML = TRUE)
+summary(fit1_c_f)
+```
+```{r}
+p_values_H <- summary(fit0_H)$coefficients[, "Pr(>|t|)"]
+p_values_a <- summary(fit0_a)$coefficients[, "Pr(>|t|)"]
+p_values_c <- summary(fit0_c)$coefficients[, "Pr(>|t|)"]
+
+all_p_values <- c(p_values_H, p_values_a, p_values_c)
+p_1 <- all_p_values
+p_1_f <- summary(fit0_c_f)$coefficients[, "Pr(>|t|)"]
+
+```
+
+
+
+```{r}
+# Stack plots with superscripts and a caption
+combined_plot <- (fig_c1 + labs(tag = "A")) /
+                 (fig_c3 + labs(tag = "B")) /
+                 (fig_c2 + labs(tag = "C")) +
+  plot_annotation(
+    tag_levels = "A"
+    #title = "Figure 1"#,
+    #caption = "CPPs marginal means for sustained high, repertoire, and medium sustained contexts."
+  ) +
+  plot_layout(heights = c(1, 1, 1))  # Equal heights
+
+# Save the combined plot with fixed dimensions
+#combined_plot
+ggsave("combined_CPPs_JASA_test_Final.pdf", plot = combined_plot, width = 6, height = 12, dpi = 300)
+
+```
+
+```{r}
+# Stack plots with superscripts and a caption
+combined_plot <- (fig_h1 + labs(tag = "A")) /
+                 (fig_h2 + labs(tag = "B")) +
+  plot_annotation(
+    tag_levels = "A"
+    #title = "Figure 1"#,
+    #caption = "CPPs marginal means for sustained high, repertoire, and medium sustained contexts."
+  ) +
+  plot_layout(heights = c(1, 1))  # Equal heights
+
+# Save the combined plot with fixed dimensions
+#combined_plot
+ggsave("combined_H1H2LTAS_JASA_test_Final.pdf", plot = combined_plot, width = 6, height = 8, dpi = 300)
+```
+```{r}
+# Stack plots with superscripts and a caption
+combined_plot <- (fig_slopes1 + labs(tag = "A")) /
+                 (fig_slopes2 + labs(tag = "B")) /
+                 (fig_slopes3 + labs(tag = "C")) +
+  plot_annotation(
+    tag_levels = "A"
+    #title = "Figure 1"#,
+    #caption = "CPPs marginal means for sustained high, repertoire, and medium sustained contexts."
+  ) +
+  plot_layout(heights = c(1, 1, 1))  # Equal heights
+
+# Save the combined plot with fixed dimensions
+#combined_plot
+ggsave("combined_Slopes.pdf", plot = combined_plot, width = 6, height = 8, dpi = 300)
+```
+
+# P-Value Adjustments
+```{r}
+
+total_p_values <- c(p_2, p_6, p_1, p_2_f, p_6_f, p_1_f)
+
+# Apply the Benjamini-Hochberg correction using p.adjust()
+adjusted_p_values_total <- p.adjust(total_p_values, method = "BH")
+
+#Final DFs
+p_values_BH_2 <- data.frame(
+  H1H2LTAS = adjusted_p_values_total[1:5],
+  AlphaRatio = adjusted_p_values_total[6:10],
+  CPPs = adjusted_p_values_total[11:15]#,
+)
+
+p_values_BH_6 <- data.frame(
+  H1H2LTAS = adjusted_p_values_total[16:20],
+  AlphaRatio = adjusted_p_values_total[21:25],
+  CPPs = adjusted_p_values_total[26:30]#,
+)
+
+p_values_BH_1 <- data.frame(
+  H1H2LTAS = adjusted_p_values_total[31:35],
+  AlphaRatio = adjusted_p_values_total[36:40],
+  CPPs = adjusted_p_values_total[41:45]#,
+)
+
+
+p_values_BH_f <- data.frame(
+  Intercept = adjusted_p_values_total[c(46, 49, 52)],
+  Years = adjusted_p_values_total[c(47, 50, 53)],
+  dSPL = adjusted_p_values_total[c(48, 51, 54)]
+)
+rownames(p_values_BH_f) <- c("High", "Rep", "Med") 
+
+# Display results with formatted tables
+cat("### High Frequency Sustained Phonation\n")
+kable(p_values_BH_2, digits = 3)
+
+cat("\n### Medium Frequency Sustained Phonation\n")
+kable(p_values_BH_1, digits = 3)
+
+cat("\n### Repertoire\n")
+kable(p_values_BH_6, digits = 3)
+
+cat("\n### Female CPPs\n")
+kable(p_values_BH_f, digits = 3)
+
+```
+
