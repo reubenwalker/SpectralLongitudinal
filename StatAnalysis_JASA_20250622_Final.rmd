@@ -347,10 +347,10 @@ fig_c1 <- plot_model(fit2_c, type = "pred", terms = c("Years", "Voice_Group"), s
            colors = palette.colors(palette = "Okabe-Ito")) +
   theme_gray(base_size=15) +
   labs(x = "Years Studied",
-		y = "CPPs",
+		y = "CPPs (dB)",
 		title = "CPPs Sustained High Marginal Means") +
   theme(aspect.ratio = 1)
-fig_c1
+#fig_c1
 ggsave("CPPsMarginal_JASA_Final.pdf", width=9.25, height=5.71)
 ```
 ```{r}
@@ -377,7 +377,7 @@ klang_clean$fitted <- fitted(fit2_c)
 klang_clean$id <- as.factor(klang_clean$id)
 klang_clean$Voice_Group <- as.factor(klang_clean$Voice_Group)
 
-fig_c1 <- plot_model(fit2_c, type = "pred", terms = c("Years", "Voice_Group"), show.data= FALSE,
+fig_c1_ <- plot_model(fit2_c, type = "pred", terms = c("Years", "Voice_Group"), show.data= FALSE,
            colors = palette.colors(palette = "Okabe-Ito")) +
   theme_gray(base_size=15) +
   labs(x = "Years Studied",
@@ -387,7 +387,7 @@ fig_c1 <- plot_model(fit2_c, type = "pred", terms = c("Years", "Voice_Group"), s
 #ggsave("H1H2LTASMarginal_JASA_Final.pdf", width=9.25, height=5.71)
 
 # Plot all subjects, colored by Voice_Group
-fig_slopes3 <- fig_c1 + geom_line(data = klang_clean, 
+fig_slopes3 <- fig_c1_ + geom_line(data = klang_clean, 
             aes(x = Years, y = fitted, group = id, color = Voice_Group), 
             alpha = 0.3, linewidth = 0.7, inherit.aes = FALSE) #+
 
@@ -603,7 +603,7 @@ print(p.fit1_c)
 fig_c2 <- plot_model(fit1_c, type = "pred", terms = c("Years", "Voice_Group"), show.data = TRUE,
                       colors = palette.colors(palette = "Okabe-Ito")) +
   theme_gray(base_size = 15) +
-  labs(x = "Years Studied", y = "CPPs", title = "CPPs Repertoire Marginal Means")
+  labs(x = "Years Studied", y = "CPPs (dB)", title = "CPPs Repertoire Marginal Means")
 fig_c2
 ggsave("CPPsAvezzoMarginal_JASA_Final.pdf", width = 9.25, height = 5.71)
 ```
@@ -782,6 +782,8 @@ anova(fit0_c)
 ```{r}
 #Remove dSPL
 fit1_c <- lmer(CPPs ~ Years * Voice_Group + (Years | id), data = klang1, REML = TRUE)
+### Not enough variance in individual slopes, change to random intercepts:
+fit1_c <- lmer(CPPs ~ Years * Voice_Group + (1 | id), data = klang1, REML = TRUE)
 anova(fit1_c)
 
 margin1 <- ggpredict(fit1_c, c("Years", "Voice_Group"), ci_level = 0.95)
@@ -797,7 +799,7 @@ p.fit1_c
 ```{r}
 fig_c3 <- plot_model(fit1_c, type = "pred", terms = c("Years", "Voice_Group"), show.data = TRUE, colors = palette.colors(palette = "Okabe-Ito")) +
   theme_gray(base_size = 15) +
-  labs(x = "Years Studied", y = "CPPs", title = "CPPs Medium Sustained Marginal Means") +
+  labs(x = "Years Studied", y = "CPPs (dB)", title = "CPPs Medium Sustained Marginal Means") +
   theme(aspect.ratio = 1)
 fig_c3
 ggsave("CPPsMediumMarginal_JASA_Final.pdf", width = 9.25, height = 5.71)
